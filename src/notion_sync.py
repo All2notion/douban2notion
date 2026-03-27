@@ -38,6 +38,20 @@ class NotionSyncer:
             id_str = id_str.strip()
             
             import re
+            
+            if '-' in id_str:
+                uuid_pattern = r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+                if re.match(uuid_pattern, id_str):
+                    logger.debug(f"检测到标准UUID格式: {id_str}")
+                else:
+                    logger.debug(f"带连字符但不是标准UUID，保留原样")
+            else:
+                hex_pattern = r'^[0-9a-fA-F]{32}$'
+                if re.match(hex_pattern, id_str):
+                    logger.debug(f"检测到32位十六进制格式: {id_str}")
+                else:
+                    logger.debug(f"不是32位十六进制，保留原样")
+            
             id_str = re.sub(r'[^a-fA-F0-9\-]', '', id_str)
             
             logger.debug(f"清理后ID: {repr(id_str)}")
