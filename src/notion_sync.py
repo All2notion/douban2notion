@@ -27,13 +27,29 @@ class NotionSyncer:
 
     def __init__(self, api_key: str, database_id: str = None, parent_page_id: str = None):
         self.client = Client(auth=api_key)
+        
+        def clean_id(id_str: str) -> str:
+            if not id_str:
+                return ""
+            id_str = id_str.strip()
+            id_str = id_str.replace('"', '').replace("'", "")
+            if id_str and len(id_str) >= 32:
+                if '-' not in id_str:
+                    id_str = f"{id_str[:8]}-{id_str[8:12]}-{id_str[12:16]}-{id_str[16:20]}-{id_str[20:]}"
+            return id_str
+        
+        database_id = clean_id(database_id)
+        parent_page_id = clean_id(parent_page_id)
+        
         self.parent_page_id = parent_page_id
         
         if database_id:
             self.database_id = database_id
+            logger.info(f"使用数据库ID: {database_id}")
             if not self._validate_database():
                 logger.warning("数据库属性不匹配，可能需要重新创建")
         elif parent_page_id:
+            logger.info(f"使用父页面ID: {parent_page_id}")
             self.database_id = self.create_database(parent_page_id)
         else:
             raise ValueError("必须提供 database_id 或 parent_page_id")
