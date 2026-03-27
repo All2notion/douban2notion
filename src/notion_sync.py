@@ -31,11 +31,16 @@ class NotionSyncer:
         def clean_id(id_str: str) -> str:
             if not id_str:
                 return ""
+            logger.debug(f"原始ID: {repr(id_str)}")
             id_str = id_str.strip()
             id_str = id_str.replace('"', '').replace("'", "")
-            if id_str and len(id_str) >= 32:
-                if '-' not in id_str:
-                    id_str = f"{id_str[:8]}-{id_str[8:12]}-{id_str[12:16]}-{id_str[16:20]}-{id_str[20:]}"
+            id_str = id_str.replace('`', '')
+            id_str = id_str.strip()
+            
+            import re
+            id_str = re.sub(r'[^a-fA-F0-9\-]', '', id_str)
+            
+            logger.debug(f"清理后ID: {repr(id_str)}")
             return id_str
         
         database_id = clean_id(database_id)
@@ -88,6 +93,9 @@ class NotionSyncer:
             "豆瓣ID": {"rich_text": {}},
         }
 
+        logger.debug(f"准备创建数据库，parent_page_id: {repr(parent_page_id)}")
+        logger.debug(f"parent_page_id 长度: {len(parent_page_id)}")
+
         try:
             database = self.client.databases.create(
                 parent={"type": "page_id", "page_id": parent_page_id},
@@ -98,6 +106,9 @@ class NotionSyncer:
             return database["id"]
         except APIResponseError as e:
             logger.error(f"创建数据库失败: {e}")
+            import json
+            if hasattr(e, 'body'):
+                logger.error(f"错误详情: {json.dumps(e.body, indent=2, ensure_ascii=False)}")
             raise
 
     def get_existing_movies(self) -> Dict[str, Dict]:

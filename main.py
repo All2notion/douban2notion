@@ -34,6 +34,11 @@ def main():
     logger.info("豆瓣电影 → Notion 同步程序启动")
     logger.info("=" * 50)
 
+    logger.debug(f"NOTION_API_KEY: {'已设置' if NOTION_API_KEY else '未设置'}")
+    logger.debug(f"NOTION_DATABASE_ID: {NOTION_DATABASE_ID}")
+    logger.debug(f"NOTION_PARENT_PAGE_ID: {NOTION_PARENT_PAGE_ID}")
+    logger.debug(f"DOUBAN_USER_ID: {DOUBAN_USER_ID}")
+
     try:
         validate_config()
     except ValueError as e:
