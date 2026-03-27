@@ -45,7 +45,8 @@ def main():
     scraper = DoubanScraper(user_id=DOUBAN_USER_ID, cookies=DOUBAN_COOKIES, delay=1.0)
 
     try:
-        movies = scraper.fetch_watched_movies(max_pages=MAX_PAGES)
+        movies = scraper.fetch_watched_movies(max_pages=1)
+        movies = movies[:10]
         logger.info(f"共获取 {len(movies)} 部电影")
     except Exception as e:
         logger.error(f"获取豆瓣数据失败: {e}")
