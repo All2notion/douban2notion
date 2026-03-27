@@ -39,10 +39,13 @@ class DoubanScraper:
 
     def fetch_watched_movies(self, max_pages: int = 10) -> List[Dict]:
         all_movies = []
+        logger.info(f"开始抓取用户 {self.user_id} 的观影记录，最多 {max_pages} 页")
+
         for page in range(1, max_pages + 1):
             try:
                 movies = self._fetch_page(page)
                 if not movies:
+                    logger.warning(f"第 {page} 页没有获取到电影，可能Cookie已失效或页面结构变化")
                     break
                 all_movies.extend(movies)
                 logger.info(f"已抓取第 {page} 页，获取 {len(movies)} 部电影")
@@ -50,15 +53,27 @@ class DoubanScraper:
             except Exception as e:
                 logger.error(f"抓取第 {page} 页失败: {e}")
                 continue
+
+        logger.info(f"共获取 {len(all_movies)} 部电影")
         return all_movies
 
     def _fetch_page(self, page: int) -> List[Dict]:
         url = f"{self.USER_URL}?start={(page - 1) * 30}&sort=date&rating=all&filter=all&mode=grid"
+        logger.info(f"请求URL: {url}")
+
         response = self.session.get(url, cookies=self.cookies, timeout=30)
-        response.raise_for_status()
+        logger.info(f"响应状态码: {response.status_code}")
+        logger.info(f"响应内容长度: {len(response.text)} 字符")
+
+        if response.status_code != 200:
+            logger.error(f"请求失败，状态码: {response.status_code}")
+            return []
+
         soup = BeautifulSoup(response.text, "html.parser")
 
         movie_items = soup.select("div.item")
+        logger.info(f"找到 {len(movie_items)} 个电影条目")
+
         movies = []
 
         for item in movie_items:
@@ -120,7 +135,7 @@ class DoubanScraper:
         return {}
 
     def _parse_movie_page(self, html: str) -> Dict:
-        soup = BeautifulSoup(html, "lxml")
+        soup = BeautifulSoup(html, "html.parser")
 
         info = {}
         info["poster_url"] = self._extract_poster(soup)
@@ -149,7 +164,7 @@ class DoubanScraper:
         if match:
             return match.group(1).strip()
 
-        soup = BeautifulSoup(html, "lxml")
+        soup = BeautifulSoup(html, "html.parser")
         info_div = soup.select_one("#info")
         if not info_div:
             return ""
