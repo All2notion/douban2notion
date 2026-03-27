@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 class DoubanScraper:
     BASE_URL = "https://movie.douban.com"
-    USER_URL = "https://movie.douban.com/people/{user_id}/collect"
 
     HEADERS = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -73,6 +72,13 @@ class DoubanScraper:
 
         movie_items = soup.select("div.item")
         logger.info(f"找到 {len(movie_items)} 个电影条目")
+
+        if len(movie_items) == 0:
+            logger.warning("未找到电影条目，可能原因：")
+            logger.warning("1. Cookie已失效，返回的是登录页面")
+            logger.warning("2. 豆瓣页面结构已变化")
+            logger.warning(f"页面标题: {soup.title.string if soup.title else '无标题'}")
+            logger.info(f"页面内容前500字符: {response.text[:500]}")
 
         movies = []
 
