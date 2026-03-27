@@ -33,5 +33,6 @@ jobs:
         env:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          NOTION_PARENT_PAGE_ID: ${{ secrets.NOTION_PARENT_PAGE_ID }}
           DOUBAN_USER_ID: ${{ secrets.DOUBAN_USER_ID }}
           DOUBAN_COOKIES: ${{ secrets.DOUBAN_COOKIES }}

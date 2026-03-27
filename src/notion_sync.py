@@ -22,13 +22,38 @@ class NotionSyncer:
         "观影日期": {"type": "date"},
         "豆瓣链接": {"type": "url"},
         "海报URL": {"type": "url"},
+        "豆瓣ID": {"type": "rich_text"},
     }
 
-    def __init__(self, api_key: str, database_id: str):
+    def __init__(self, api_key: str, database_id: str = None, parent_page_id: str = None):
         self.client = Client(auth=api_key)
-        self.database_id = database_id
+        self.parent_page_id = parent_page_id
+        
+        if database_id:
+            self.database_id = database_id
+            if not self._validate_database():
+                logger.warning("数据库属性不匹配，可能需要重新创建")
+        elif parent_page_id:
+            self.database_id = self.create_database(parent_page_id)
+        else:
+            raise ValueError("必须提供 database_id 或 parent_page_id")
 
-    def create_database(self, parent_page_id: str = None) -> str:
+    def _validate_database(self) -> bool:
+        try:
+            db = self.client.databases.retrieve(database_id=self.database_id)
+            props = db.get("properties", {})
+            required = {"电影名称", "导演", "编剧", "主演", "类型", "豆瓣ID"}
+            existing = set(props.keys())
+            missing = required - existing
+            if missing:
+                logger.warning(f"数据库缺少属性: {missing}")
+                return False
+            return True
+        except APIResponseError as e:
+            logger.error(f"验证数据库失败: {e}")
+            return False
+
+    def create_database(self, parent_page_id: str) -> str:
         properties = {
             "电影名称": {"title": {}},
             "导演": {"rich_text": {}},
@@ -44,11 +69,12 @@ class NotionSyncer:
             "观影日期": {"date": {}},
             "豆瓣链接": {"url": {}},
             "海报URL": {"url": {}},
+            "豆瓣ID": {"rich_text": {}},
         }
 
         try:
             database = self.client.databases.create(
-                parent={"type": "page_id", "page_id": parent_page_id} if parent_page_id else {"type": "workspace"},
+                parent={"type": "page_id", "page_id": parent_page_id},
                 title=[{"type": "text", "text": {"content": "豆瓣电影收藏"}}],
                 properties=properties,
             )
@@ -65,15 +91,26 @@ class NotionSyncer:
             for page in results.get("results", []):
                 props = page.get("properties", {})
                 name = self._get_title(props)
-                if name:
-                    existing[name] = {
+                douban_id = self._get_rich_text(props, "豆瓣ID")
+                
+                if douban_id:
+                    existing[douban_id] = {
                         "id": page["id"],
+                        "name": name,
                         "rating": props.get("豆瓣评分", {}).get("number"),
                         "watched_date": props.get("观影日期", {}).get("date", {}).get("start"),
                     }
         except APIResponseError as e:
             logger.error(f"查询已有电影失败: {e}")
         return existing
+
+    def _get_rich_text(self, props: Dict, prop_name: str) -> str:
+        prop = props.get(prop_name, {})
+        if prop.get("type") == "rich_text":
+            rt_list = prop.get("rich_text", [])
+            if rt_list:
+                return rt_list[0].get("text", {}).get("content", "")
+        return ""
 
     def sync_movies(self, movies: List[Dict], existing: Dict[str, Dict]) -> Dict[str, int]:
         stats = {"created": 0, "updated": 0, "skipped": 0, "errors": 0}
@@ -94,11 +131,12 @@ class NotionSyncer:
         return stats
 
     def _sync_single_movie(self, movie: Dict, existing: Dict[str, Dict]) -> str:
+        douban_id = movie.get("douban_id")
         name = movie.get("name", "Unknown")
 
-        if name in existing:
-            existing_movie = existing[name]
-            if movie.get("rating") == existing_movie.get("rating") and movie.get("watched_date") == existing_movie.get("watched_date"):
+        if douban_id and douban_id in existing:
+            existing_movie = existing[douban_id]
+            if self._is_unchanged(movie, existing_movie):
                 logger.debug(f"跳过已有电影: {name}")
                 return "skipped"
 
@@ -109,6 +147,15 @@ class NotionSyncer:
             self._create_movie_page(movie)
             logger.info(f"创建电影: {name}")
             return "created"
+
+    def _is_unchanged(self, movie: Dict, existing_movie: Dict) -> bool:
+        movie_rating = movie.get("rating")
+        existing_rating = existing_movie.get("rating")
+        
+        movie_date = movie.get("watched_date")
+        existing_date = existing_movie.get("watched_date")
+        
+        return movie_rating == existing_rating and movie_date == existing_date
 
     def _create_movie_page(self, movie: Dict):
         properties = self._build_properties(movie)
@@ -188,6 +235,9 @@ class NotionSyncer:
 
         properties["豆瓣链接"] = {"url": movie.get("douban_url", "")} if movie.get("douban_url") else {"url": None}
         properties["海报URL"] = {"url": movie.get("poster_url", "")} if movie.get("poster_url") else {"url": None}
+        
+        douban_id = movie.get("douban_id", "")
+        properties["豆瓣ID"] = {"rich_text": rich_text(douban_id)}
 
         return properties
 
