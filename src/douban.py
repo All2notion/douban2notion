@@ -87,46 +87,65 @@ class DoubanScraper:
 
         movies = []
 
-        for item in movie_items:
+        for idx, item in enumerate(movie_items):
+            logger.debug(f"正在解析第 {idx+1} 个电影条目...")
             movie = self._parse_movie_item(item)
             if movie:
                 movies.append(movie)
+                logger.debug(f"成功解析电影: {movie.get('name', '未知')}")
 
         return movies
 
     def _parse_movie_item(self, item) -> Optional[Dict]:
         try:
-            title_elem = item.select_one("div.info div.hd a")
+            item_html = str(item)
+            logger.debug(f"条目HTML前1000字符: {item_html[:1000]}")
+            
+            title_elem = item.select_one("li.pic a") or item.select_one("a.nbg")
             if not title_elem:
+                logger.warning("未找到标题链接元素")
+                title_elem = item.select_one("a")
+            
+            if not title_elem:
+                logger.warning("未找到任何链接元素")
                 return None
 
             douban_url = title_elem.get("href", "")
+            logger.debug(f"电影链接: {douban_url}")
+            
             movie_id = self._extract_movie_id(douban_url)
+            logger.debug(f"电影ID: {movie_id}")
 
-            detail = item.select_one("div.info div.bd")
-            if not detail:
-                return None
+            title_elem_for_name = title_elem
+            name_elem = item.select_one("li.title a") or item.select_one("a.title")
+            if not name_elem:
+                name_elem = title_elem_for_name
+                
+            name = name_elem.get("title", "") or name_elem.get_text(strip=True)
+            logger.debug(f"电影名称: {name}")
 
-            info_text = detail.get_text(strip=True)
-
-            rating_elem = item.select_one("span.rating_nums")
+            rating_elem = item.select_one("span.rating_nums") or item.select_one("span[class*='rating']")
             rating = rating_elem.get_text(strip=True) if rating_elem else "N/A"
+            logger.debug(f"我的评分: {rating}")
 
             date_elem = item.select_one("span.date")
             watched_date = date_elem.get_text(strip=True) if date_elem else ""
+            logger.debug(f"观看日期: {watched_date}")
 
             movie_info = self.fetch_movie_detail(movie_id)
 
             return {
                 "douban_id": movie_id,
                 "douban_url": douban_url,
-                "name": title_elem.select_one("span.title").get_text(strip=True) if title_elem.select_one("span.title") else "",
+                "name": name,
                 "rating": rating,
                 "watched_date": watched_date,
                 **movie_info,
             }
         except Exception as e:
             logger.error(f"解析电影条目失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
 
     def _extract_movie_id(self, url: str) -> str:
