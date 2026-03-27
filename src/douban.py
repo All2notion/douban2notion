@@ -58,7 +58,7 @@ class DoubanScraper:
         return all_movies
 
     def _fetch_page(self, page: int) -> List[Dict]:
-        url = f"{self.USER_URL}?start={(page - 1) * 30}&sort=date&rating=all&filter=all&mode=grid"
+        url = f"https://movie.douban.com/people/{self.user_id}/collect?start={(page - 1) * 30}&sort=date&rating=all&filter=all&mode=grid"
         logger.info(f"请求URL: {url}")
 
         response = self.session.get(url, cookies=self.cookies, timeout=30)
